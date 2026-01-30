@@ -4,7 +4,7 @@ name: Docker Build and Publish
 # Images are multi-platform (amd64/arm64) and automatically tagged based on git refs
 # 
 # Triggers:
-# - Push to main branch -> ghcr.io/OWNER/REPO:latest
+# - Push to main branch -> ghcr.io/OWNER/REPO:main and ghcr.io/OWNER/REPO:latest
 # - Push tags matching v*.*.* -> ghcr.io/OWNER/REPO:v1.0.0, v1.0, v1
 # - Pull requests -> Build only (no push)
 # - Manual trigger via workflow_dispatch
@@ -74,6 +74,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            NEXT_PUBLIC_API_URL=/api_be
+
 

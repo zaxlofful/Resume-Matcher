@@ -6,10 +6,6 @@
 # ============================================
 FROM node:22 AS frontend-builder
 
-# Build argument for API URL (allows customization at build time)
-# Default to /api_be which uses Next.js proxy for same-origin requests
-ARG NEXT_PUBLIC_API_URL=/api_be
-
 WORKDIR /app/frontend
 
 # Copy package files first for better caching
@@ -21,11 +17,8 @@ RUN npm ci
 # Copy frontend source
 COPY apps/frontend/ ./
 
-# Set environment variable for production build
-# Note: This is only used as a fallback if runtime config is not available
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-
 # Build the frontend
+# No NEXT_PUBLIC_API_URL needed - runtime config handles this
 RUN npm run build
 
 # ============================================

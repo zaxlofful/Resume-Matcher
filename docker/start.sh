@@ -106,7 +106,7 @@ echo ""
 info "Generating runtime configuration..."
 
 # Escape single quotes in the URL for safe JavaScript injection
-# Use printf for more secure escaping than sed
+# printf '%s\n' outputs the value, which is then piped to sed for single-quote escaping
 ESCAPED_API_URL=$(printf '%s\n' "$RUNTIME_API_URL" | sed "s/'/'\\\\''/g")
 
 cat > /app/frontend/public/config.js << EOF

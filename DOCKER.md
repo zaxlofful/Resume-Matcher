@@ -51,8 +51,8 @@ Images are published at: `ghcr.io/zaxlofful/resume-matcher`
 
 **Available Tags:**
 - `latest` - Latest build from the main branch
-- `v*.*.*` - Specific version releases (e.g., `v1.0.0`)
-- `main-{sha}` - Builds from specific commits on main branch
+- `main` - Image built from the current main branch
+- `v*.*.*` - Specific version releases (e.g., `v1.0.0`, `v1.0`, `v1`)
 
 ### Using Pre-built Images
 

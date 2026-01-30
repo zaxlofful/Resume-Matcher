@@ -6,7 +6,7 @@
 
 // Runtime configuration support
 // Reads from window.__RUNTIME_CONFIG__ which is injected via /config.js at startup
-// Falls back to build-time env var, then default
+// Defaults to /api_be proxy path for same-origin requests
 declare global {
   interface Window {
     __RUNTIME_CONFIG__?: {
@@ -16,12 +16,12 @@ declare global {
 }
 
 function getApiUrl(): string {
-  // In browser, check runtime config first
+  // In browser, check runtime config
   if (typeof window !== 'undefined' && window.__RUNTIME_CONFIG__?.API_URL) {
     return window.__RUNTIME_CONFIG__.API_URL;
   }
-  // Fall back to build-time env var or default
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  // Default to /api_be proxy path
+  return '/api_be';
 }
 
 // Export as getter functions to support runtime configuration
@@ -33,9 +33,13 @@ export function getAPIBase(): string {
   return `${getApiUrl()}/api/v1`;
 }
 
-// Legacy constant exports for backward compatibility
-// These are evaluated once at module load time and will reflect runtime config
-// since config.js loads synchronously before the app hydrates
+// Legacy constant exports for backward compatibility.
+// NOTE: These are evaluated once at module load time:
+// - On the client, they reflect runtime config from window.__RUNTIME_CONFIG__
+//   which is set by config.js before hydration
+// - On the server (SSR/API routes), window is not available, so they will
+//   use the default /api_be proxy path
+// Prefer using getAPIUrl() / getAPIBase() in new code for consistency.
 export const API_URL = getApiUrl();
 export const API_BASE = getAPIBase();
 

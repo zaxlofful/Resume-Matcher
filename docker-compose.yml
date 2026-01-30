@@ -3,10 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Build arg for Next.js proxy path (default: /api_be)
-      # This is only used as a fallback in the JS bundle
-      args:
-        - NEXT_PUBLIC_API_URL=/api_be
     image: resume-matcher
     container_name: resume-matcher
     # Port mapping: HOST_PORT:CONTAINER_PORT
