@@ -19,6 +19,14 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 # Can be overridden with RUNTIME_API_URL env var for custom backends
 RUNTIME_API_URL="${RUNTIME_API_URL:-/api_be}"
 
+# Validate RUNTIME_API_URL to prevent injection attacks
+# Allow: alphanumeric, /, :, ., -, _
+if ! echo "$RUNTIME_API_URL" | grep -qE '^[a-zA-Z0-9/:._-]+$'; then
+    error "Invalid RUNTIME_API_URL: contains dangerous characters"
+    error "RUNTIME_API_URL must only contain: a-z A-Z 0-9 / : . - _"
+    exit 1
+fi
+
 # Print banner
 print_banner() {
     echo -e "${CYAN}"

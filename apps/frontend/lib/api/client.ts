@@ -33,7 +33,9 @@ export function getAPIBase(): string {
   return `${getApiUrl()}/api/v1`;
 }
 
-// Legacy exports for backward compatibility (call getters)
+// Legacy constant exports for backward compatibility
+// These are evaluated once at module load time and will reflect runtime config
+// since config.js loads synchronously before the app hydrates
 export const API_URL = getApiUrl();
 export const API_BASE = getAPIBase();
 

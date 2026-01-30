@@ -345,3 +345,4 @@ docker inspect resume-matcher | jq '.[0].State.Health'
 For information about contributing to Resume Matcher, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 For questions or support, join our [Discord server](https://dsc.gg/resume-matcher).
+

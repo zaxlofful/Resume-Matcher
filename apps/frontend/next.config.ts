@@ -10,10 +10,10 @@ const nextConfig: NextConfig = {
     turbopackUseSystemTlsCerts: true,
   },
   async rewrites() {
-    // Only apply proxy rewrite if API_URL doesn't start with /
-    // (i.e., it's an absolute URL like http://localhost:8000)
+    // Only apply proxy rewrite if API_URL is an absolute URL (http://...)
+    // Root-relative paths (starting with /) are handled by runtime config
     if (API_URL.startsWith('/')) {
-      // Runtime config will handle relative URLs
+      // Runtime config will handle relative paths
       return [];
     }
     return [
