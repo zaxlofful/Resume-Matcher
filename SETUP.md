@@ -333,6 +333,8 @@ LLM_API_BASE=http://host.docker.internal:11434 docker-compose up -d
 
 Resume Matcher images are automatically built and published to GitHub Container Registry:
 
+> **Note**: Images are published to the repository owner's container registry. Replace `zaxlofful` with the appropriate repository owner if using a different fork.
+
 ```bash
 # Pull and run the latest image
 docker pull ghcr.io/zaxlofful/resume-matcher:latest

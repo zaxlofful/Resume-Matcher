@@ -224,6 +224,8 @@ docker-compose up -d
 
 **Using Pre-built Images from GitHub Container Registry:**
 
+> **Note**: Replace `zaxlofful` with the repository owner's username. For the main repository, images are published as they become available.
+
 ```bash
 # Pull and run the latest image
 docker pull ghcr.io/zaxlofful/resume-matcher:latest

@@ -43,6 +43,8 @@ The application will be available at:
 
 Resume Matcher images are automatically built and published to GitHub Container Registry via GitHub Actions.
 
+> **Note for Forks**: Images are published to the repository owner's container registry. If you're using this from a fork, replace `zaxlofful` with your GitHub username in the image paths below, or use the original images from the main repository.
+
 ### Available Images
 
 Images are published at: `ghcr.io/zaxlofful/resume-matcher`
