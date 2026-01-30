@@ -14,6 +14,11 @@ BOLD='\033[1m'
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 
+# API URL configuration for runtime injection
+# Default: Use /api_be proxy path for same-origin requests (avoids CORS)
+# Can be overridden with RUNTIME_API_URL env var for custom backends
+RUNTIME_API_URL="${RUNTIME_API_URL:-/api_be}"
+
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
@@ -86,7 +91,19 @@ print_banner
 info "Port configuration:"
 echo -e "  Frontend port: ${BOLD}${FRONTEND_PORT}${NC}"
 echo -e "  Backend port:  ${BOLD}${BACKEND_PORT}${NC}"
+echo -e "  API URL:       ${BOLD}${RUNTIME_API_URL}${NC}"
 echo ""
+
+# Generate runtime configuration for frontend
+info "Generating runtime configuration..."
+cat > /app/frontend/public/config.js << EOF
+// Runtime configuration - generated at startup
+// API_URL can be customized via RUNTIME_API_URL environment variable
+window.__RUNTIME_CONFIG__ = {
+  API_URL: '${RUNTIME_API_URL}'
+};
+EOF
+status "Runtime configuration generated"
 
 # Check and create data directory
 info "Checking data directory..."

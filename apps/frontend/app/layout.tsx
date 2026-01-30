@@ -24,6 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-US" className="h-full" suppressHydrationWarning>
+      <head>
+        {/* Runtime configuration - generated at container startup */}
+        <script src="/config.js" defer></script>
+      </head>
       <body
         className={`${geist.variable} ${spaceGrotesk.variable} antialiased bg-[#F0F0E8] text-gray-900 min-h-full`}
       >
