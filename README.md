@@ -213,11 +213,24 @@ Open **<http://localhost:3000>** and configure your AI provider in Settings.
 
 ### Docker Deployment
 
-```bash
-docker pull srbhr/resume-matcher:latest
+**Quick Start:**
 
-docker run srbhr/resume-matcher:latest
+```bash
+# Using Docker Compose (recommended)
+git clone https://github.com/srbhr/Resume-Matcher.git
+cd Resume-Matcher
+docker-compose up -d
 ```
+
+**Using Pre-built Images from GitHub Container Registry:**
+
+```bash
+# Pull and run the latest image
+docker pull ghcr.io/zaxlofful/resume-matcher:latest
+docker run -p 3000:3000 -p 8000:8000 ghcr.io/zaxlofful/resume-matcher:latest
+```
+
+For detailed Docker instructions, including runtime configuration and multi-platform builds, see **[DOCKER.md](DOCKER.md)**.
 
 <!-- Note: Docker documentation is pending. For now, use docker-compose.yml as reference -->
 
