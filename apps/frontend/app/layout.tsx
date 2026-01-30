@@ -27,7 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Runtime configuration - must load synchronously before app hydration */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="/config.js"></script>
+        <script
+          src="/config.js"
+          onError={() => {
+            console.warn('Runtime config failed to load, using build-time defaults');
+          }}
+        ></script>
       </head>
       <body
         className={`${geist.variable} ${spaceGrotesk.variable} antialiased bg-[#F0F0E8] text-gray-900 min-h-full`}

@@ -104,11 +104,15 @@ echo ""
 
 # Generate runtime configuration for frontend
 info "Generating runtime configuration..."
+
+# Escape single quotes in the URL for safe JavaScript injection
+ESCAPED_API_URL=$(echo "$RUNTIME_API_URL" | sed "s/'/\\\'/g")
+
 cat > /app/frontend/public/config.js << EOF
 // Runtime configuration - generated at startup
 // API_URL can be customized via RUNTIME_API_URL environment variable
 window.__RUNTIME_CONFIG__ = {
-  API_URL: '${RUNTIME_API_URL}'
+  API_URL: '${ESCAPED_API_URL}'
 };
 EOF
 status "Runtime configuration generated"
