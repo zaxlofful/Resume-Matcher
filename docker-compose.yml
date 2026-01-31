@@ -1,26 +1,34 @@
 services:
+  # Traefik reverse proxy for routing and SSL/TLS termination
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
   resume-matcher:
     build:
       context: .
       dockerfile: Dockerfile
     image: resume-matcher
     container_name: resume-matcher
-    # Port mapping: HOST_PORT:CONTAINER_PORT
-    # Customize host ports via environment variables (container ports are fixed)
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"   # Frontend (Next.js)
-      - "${BACKEND_PORT:-8000}:8000"    # Backend API (FastAPI)
+    # No direct port exposure - access via Traefik
     volumes:
       - resume-data:/app/backend/data
+      - backend-socket:/tmp  # Unix socket for backend-frontend communication
     environment:
       - NODE_ENV=production
-      # Pass port configuration to container for internal use
-      - FRONTEND_PORT=${FRONTEND_PORT:-3000}
-      - BACKEND_PORT=${BACKEND_PORT:-8000}
-      # Runtime API URL - can be customized at runtime (no rebuild needed)
-      # Default: /api_be uses Next.js proxy for same-origin requests (avoids CORS)
-      # Override to use direct backend URL: RUNTIME_API_URL=http://localhost:8000
-      - RUNTIME_API_URL=${RUNTIME_API_URL:-/api_be}
       # LLM Configuration - configure via Settings UI or set env vars for explicit overrides
       # Supported providers: openai, anthropic, openrouter, gemini, deepseek, ollama
       # Defaults are defined in apps/backend/app/config.py
@@ -31,9 +39,18 @@ services:
       # - LLM_API_BASE=http://host.docker.internal:11434
       - LLM_API_BASE=${LLM_API_BASE:-}
     restart: unless-stopped
+    labels:
+      # Enable Traefik for this service
+      - "traefik.enable=true"
+      # HTTP router
+      - "traefik.http.routers.resume-matcher.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.resume-matcher.entrypoints=web"
+      - "traefik.http.routers.resume-matcher.service=resume-matcher"
+      # Service configuration
+      - "traefik.http.services.resume-matcher.loadbalancer.server.port=3000"
     healthcheck:
-      # Health check uses internal container port (always 8000)
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      # Health check uses Unix socket
+      test: ["CMD", "curl", "-f", "--unix-socket", "/tmp/backend.sock", "http://localhost/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,4 +58,6 @@ services:
 
 volumes:
   resume-data:
+    driver: local
+  backend-socket:
     driver: local

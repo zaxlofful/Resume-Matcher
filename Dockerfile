@@ -115,7 +115,9 @@ USER appuser
 RUN python -m playwright install chromium
 
 # Expose ports
-EXPOSE 3000 8000
+# Frontend runs on 3000 internally (accessed via Traefik)
+# Backend runs on Unix socket (no port exposure)
+EXPOSE 3000
 
 # Volume for persistent data
 VOLUME ["/app/backend/data"]
@@ -123,9 +125,9 @@ VOLUME ["/app/backend/data"]
 # Set working directory
 WORKDIR /app
 
-# Health check (endpoint is at /api/v1/health per backend router configuration)
+# Health check (uses Unix socket)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f --unix-socket /tmp/backend.sock http://localhost/api/v1/health || exit 1
 
 # Start the application
 CMD ["/app/start.sh"]
