@@ -11,7 +11,8 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Unix socket configuration for backend-frontend communication
-BACKEND_SOCKET="/tmp/backend.sock"
+# Using /run per FHS 3.0 specification for runtime variable data
+BACKEND_SOCKET="/run/backend.sock"
 
 # Print banner
 print_banner() {

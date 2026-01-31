@@ -26,7 +26,7 @@ services:
     # No direct port exposure - access via Traefik
     volumes:
       - resume-data:/app/backend/data
-      - backend-socket:/tmp  # Unix socket for backend-frontend communication
+      - backend-socket:/run  # Unix socket for backend-frontend communication
     environment:
       - NODE_ENV=production
       # LLM Configuration - configure via Settings UI or set env vars for explicit overrides
@@ -50,7 +50,7 @@ services:
       - "traefik.http.services.resume-matcher.loadbalancer.server.port=3000"
     healthcheck:
       # Health check uses Unix socket
-      test: ["CMD", "curl", "-f", "--unix-socket", "/tmp/backend.sock", "http://localhost/api/v1/health"]
+      test: ["CMD", "curl", "-f", "--unix-socket", "/run/backend.sock", "http://localhost/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3

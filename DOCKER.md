@@ -45,7 +45,7 @@ Resume Matcher uses a modern architecture with the following components:
 
 ### Communication Architecture
 
-- **Backend**: Runs on Unix socket (`/tmp/backend.sock`) for internal communication
+- **Backend**: Runs on Unix socket (`/run/backend.sock`) for internal communication
 - **Frontend**: Runs on port 3000 internally, accessed via Traefik
 - **Traefik**: Reverse proxy handling external traffic on ports 80/443
 
@@ -336,10 +336,10 @@ This should not occur with Unix socket architecture, but if you see errors:
 docker exec -it resume-matcher sh
 
 # Check if socket exists
-ls -la /tmp/backend.sock
+ls -la /run/backend.sock
 
 # Test socket connectivity
-curl --unix-socket /tmp/backend.sock http://localhost/api/v1/health
+curl --unix-socket /run/backend.sock http://localhost/api/v1/health
 ```
 
 **Solution 2: Check backend logs**
@@ -383,10 +383,10 @@ curl -I http://resume.example.com
 docker exec resume-matcher ps aux | grep uvicorn
 
 # Test health endpoint directly
-docker exec resume-matcher curl --unix-socket /tmp/backend.sock http://localhost/api/v1/health
+docker exec resume-matcher curl --unix-socket /run/backend.sock http://localhost/api/v1/health
 
 # Check for socket permissions
-docker exec resume-matcher ls -la /tmp/backend.sock
+docker exec resume-matcher ls -la /run/backend.sock
 ```
 
 ### Issue: Changes not taking effect

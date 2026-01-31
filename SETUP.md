@@ -276,7 +276,7 @@ Access the application at **http://localhost** (via Traefik on port 80).
 ### Architecture
 
 Resume Matcher uses:
-- **Backend**: Runs on Unix socket (`/tmp/backend.sock`) for secure internal communication
+- **Backend**: Runs on Unix socket (`/run/backend.sock`) for secure internal communication
 - **Frontend**: Runs on port 3000 internally
 - **Traefik**: Reverse proxy handling external traffic on ports 80/443
 - **Traefik Dashboard**: Available at http://localhost:8080

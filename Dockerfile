@@ -127,7 +127,7 @@ WORKDIR /app
 
 # Health check (uses Unix socket)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f --unix-socket /tmp/backend.sock http://localhost/api/v1/health || exit 1
+    CMD curl -f --unix-socket /run/backend.sock http://localhost/api/v1/health || exit 1
 
 # Start the application
 CMD ["/app/start.sh"]

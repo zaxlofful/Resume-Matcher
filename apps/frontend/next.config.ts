@@ -7,11 +7,11 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     // Proxy /api requests to the backend Unix socket
-    // Backend runs on Unix socket at /tmp/backend.sock
+    // Backend runs on Unix socket at /run/backend.sock per FHS 3.0
     return [
       {
         source: '/api/:path*',
-        destination: 'unix:/tmp/backend.sock:/api/:path*',
+        destination: 'unix:/run/backend.sock:/api/:path*',
       },
     ];
   },
