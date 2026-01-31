@@ -10,22 +10,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
-# Port configuration (can be overridden via environment variables)
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
-
-# API URL configuration for runtime injection
-# Default: Use /api_be proxy path for same-origin requests (avoids CORS)
-# Can be overridden with RUNTIME_API_URL env var for custom backends
-RUNTIME_API_URL="${RUNTIME_API_URL:-/api_be}"
-
-# Validate RUNTIME_API_URL to prevent injection attacks
-# Allow: alphanumeric, /, :, ., -, _
-if ! echo "$RUNTIME_API_URL" | grep -qE '^[a-zA-Z0-9/:._-]+$'; then
-    error "Invalid RUNTIME_API_URL: contains dangerous characters"
-    error "RUNTIME_API_URL must only contain: a-z A-Z 0-9 / : . - _"
-    exit 1
-fi
+# Unix socket configuration for backend-frontend communication
+# Using /run per FHS 3.0 specification for runtime variable data
+BACKEND_SOCKET="/run/backend.sock"
 
 # Print banner
 print_banner() {
@@ -85,6 +72,12 @@ cleanup() {
         wait "$BACKEND_PID" 2>/dev/null || true
     fi
 
+    # Clean up Unix socket
+    if [ -S "$BACKEND_SOCKET" ]; then
+        rm -f "$BACKEND_SOCKET"
+        status "Cleaned up Unix socket"
+    fi
+
     status "Shutdown complete"
     exit 0
 }
@@ -95,28 +88,11 @@ trap cleanup SIGTERM SIGINT SIGQUIT
 # Print banner
 print_banner
 
-# Display port configuration
-info "Port configuration:"
-echo -e "  Frontend port: ${BOLD}${FRONTEND_PORT}${NC}"
-echo -e "  Backend port:  ${BOLD}${BACKEND_PORT}${NC}"
-echo -e "  API URL:       ${BOLD}${RUNTIME_API_URL}${NC}"
+# Display configuration
+info "Configuration:"
+echo -e "  Backend socket: ${BOLD}${BACKEND_SOCKET}${NC}"
+echo -e "  Frontend port:  ${BOLD}3000${NC} (internal only)"
 echo ""
-
-# Generate runtime configuration for frontend
-info "Generating runtime configuration..."
-
-# Escape single quotes in the URL for safe JavaScript injection
-# printf '%s\n' outputs the value, which is then piped to sed for single-quote escaping
-ESCAPED_API_URL=$(printf '%s\n' "$RUNTIME_API_URL" | sed "s/'/'\\\\''/g")
-
-cat > /app/frontend/public/config.js << EOF
-// Runtime configuration - generated at startup
-// API_URL can be customized via RUNTIME_API_URL environment variable
-window.__RUNTIME_CONFIG__ = {
-  API_URL: '${ESCAPED_API_URL}'
-};
-EOF
-status "Runtime configuration generated"
 
 # Check and create data directory
 info "Checking data directory..."
@@ -142,15 +118,19 @@ fi
 
 # Start backend
 echo ""
-info "Starting backend server on port ${BACKEND_PORT}..."
+info "Starting backend server on Unix socket..."
 cd /app/backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} &
+
+# Clean up any existing socket
+rm -f "$BACKEND_SOCKET"
+
+python -m uvicorn app.main:app --uds "$BACKEND_SOCKET" &
 BACKEND_PID=$!
 
 # Wait for backend to be ready
 info "Waiting for backend to be ready..."
 for i in {1..30}; do
-    if curl -s "http://localhost:${BACKEND_PORT}/api/v1/health" > /dev/null 2>&1; then
+    if [ -S "$BACKEND_SOCKET" ] && curl -s --unix-socket "$BACKEND_SOCKET" "http://localhost/api/v1/health" > /dev/null 2>&1; then
         status "Backend is ready (PID: $BACKEND_PID)"
         break
     fi
@@ -163,11 +143,11 @@ done
 
 # Start frontend
 echo ""
-info "Starting frontend server on port ${FRONTEND_PORT}..."
+info "Starting frontend server on port 3000..."
 cd /app/frontend
 
 # Next.js uses PORT environment variable
-export PORT="${FRONTEND_PORT}"
+export PORT="3000"
 npm start &
 FRONTEND_PID=$!
 
@@ -176,9 +156,9 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 status "Resume Matcher is running!"
 echo ""
-echo -e "  ${BOLD}Frontend:${NC}  http://localhost:${FRONTEND_PORT}"
-echo -e "  ${BOLD}Backend:${NC}   http://localhost:${BACKEND_PORT}"
-echo -e "  ${BOLD}API Docs:${NC}  http://localhost:${BACKEND_PORT}/docs"
+echo -e "  ${BOLD}Access via Traefik:${NC}  http://localhost (port 80)"
+echo -e "  ${BOLD}Traefik Dashboard:${NC}  http://localhost:8080"
+echo -e "  ${BOLD}Backend:${NC}           Unix socket at ${BACKEND_SOCKET}"
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""

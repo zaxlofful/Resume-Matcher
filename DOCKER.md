@@ -1,15 +1,16 @@
 # Docker Deployment & Configuration Guide
 
-This document describes the Docker deployment process and runtime configuration features for Resume Matcher.
+This document describes the Docker deployment process with Traefik integration for Resume Matcher.
 
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [GitHub Container Registry](#github-container-registry)
-3. [Runtime Configuration](#runtime-configuration)
-4. [Building Images](#building-images)
-5. [Environment Variables](#environment-variables)
-6. [Troubleshooting](#troubleshooting)
+2. [Architecture Overview](#architecture-overview)
+3. [GitHub Container Registry](#github-container-registry)
+4. [Traefik Integration](#traefik-integration)
+5. [Building Images](#building-images)
+6. [Environment Variables](#environment-variables)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -33,9 +34,28 @@ docker-compose down
 ```
 
 The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+- **Frontend**: http://localhost (via Traefik on port 80)
+- **Traefik Dashboard**: http://localhost:8080
+
+---
+
+## Architecture Overview
+
+Resume Matcher uses a modern architecture with the following components:
+
+### Communication Architecture
+
+- **Backend**: Runs on Unix socket (`/run/backend.sock`) for internal communication
+- **Frontend**: Runs on port 3000 internally, accessed via Traefik
+- **Traefik**: Reverse proxy handling external traffic on ports 80/443
+
+### Benefits
+
+- **Security**: Backend not exposed to network, reduced attack surface
+- **Performance**: Unix sockets are faster than TCP/IP for local communication
+- **Simplicity**: No runtime configuration generation or validation needed
+- **Professional**: Traefik is industry standard for container routing
+- **Scalability**: Easy to add SSL/TLS, load balancing, and multiple instances
 
 ---
 
@@ -56,36 +76,54 @@ Images are published at: `ghcr.io/zaxlofful/resume-matcher`
 
 ### Using Pre-built Images
 
-#### Option 1: Direct Docker Run
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/zaxlofful/resume-matcher:latest
-
-# Run the container
-docker run -d \
-  -p 3000:3000 \
-  -p 8000:8000 \
-  -v resume-data:/app/backend/data \
-  -e LLM_PROVIDER=openai \
-  -e LLM_API_KEY=your-api-key \
-  ghcr.io/zaxlofful/resume-matcher:latest
-```
-
-#### Option 2: Docker Compose with Pre-built Image
+#### Option 1: Docker Compose with Pre-built Image
 
 Modify your `docker-compose.yml`:
 
 ```yaml
 services:
+  traefik:
+    # ... traefik configuration ...
+  
   resume-matcher:
     image: ghcr.io/zaxlofful/resume-matcher:latest
     # Comment out or remove the 'build:' section
     container_name: resume-matcher
-    ports:
-      - "3000:3000"
-      - "8000:8000"
     # ... rest of your configuration
+```
+
+#### Option 2: Direct Docker Run (Not Recommended)
+
+When running without docker-compose, you need to manually set up networking:
+
+```bash
+# Create a network for Traefik
+docker network create traefik
+
+# Run Traefik
+docker run -d \
+  --name traefik \
+  --network traefik \
+  -p 80:80 -p 443:443 -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  traefik:v3.0 \
+  --api.insecure=true \
+  --providers.docker=true \
+  --providers.docker.exposedbydefault=false \
+  --entrypoints.web.address=:80
+
+# Run Resume Matcher
+docker run -d \
+  --name resume-matcher \
+  --network traefik \
+  -v resume-data:/app/backend/data \
+  -e LLM_PROVIDER=openai \
+  -e LLM_API_KEY=your-api-key \
+  --label "traefik.enable=true" \
+  --label "traefik.http.routers.resume-matcher.rule=Host(\`localhost\`)" \
+  --label "traefik.http.routers.resume-matcher.entrypoints=web" \
+  --label "traefik.http.services.resume-matcher.loadbalancer.server.port=3000" \
+  ghcr.io/zaxlofful/resume-matcher:latest
 ```
 
 ### Multi-Platform Support
@@ -98,57 +136,88 @@ Docker will automatically pull the correct image for your platform.
 
 ---
 
-## Runtime Configuration
+## Traefik Integration
 
-Resume Matcher now supports runtime configuration for the API URL - **no rebuild required** when changing ports or backend URLs!
+Traefik serves as the reverse proxy and edge router for Resume Matcher, providing:
 
-### How It Works
+- Automatic service discovery via Docker labels
+- SSL/TLS termination (when configured)
+- Load balancing capabilities
+- Professional routing and middleware support
 
-1. The frontend uses a runtime configuration file (`/config.js`) that is generated at container startup
-2. Configuration is controlled via environment variables
-3. Changes take effect immediately when the container restarts - no image rebuild needed
+### Default Configuration
 
-### Customizing API URL
+The default `docker-compose.yml` includes:
 
-#### Default Configuration (Recommended)
+```yaml
+traefik:
+  image: traefik:v3.0
+  command:
+    - "--api.insecure=true"
+    - "--providers.docker=true"
+    - "--providers.docker.exposedbydefault=false"
+    - "--entrypoints.web.address=:80"
+    - "--entrypoints.websecure.address=:443"
+  ports:
+    - "80:80"      # HTTP
+    - "443:443"    # HTTPS
+    - "8080:8080"  # Dashboard
+```
 
-By default, the frontend uses the `/api_be` proxy path which leverages Next.js rewrites:
+### Custom Domain Configuration
+
+To use a custom domain, set the `DOMAIN` environment variable:
 
 ```bash
-# Default behavior - uses proxy path
-docker-compose up -d
+# In .env file
+DOMAIN=resume.example.com
+
+# Or inline
+DOMAIN=resume.example.com docker-compose up -d
 ```
 
-This configuration:
-- Avoids CORS issues (same-origin requests)
-- Works with any port mapping
-- No additional configuration needed
+Then configure your DNS to point to your server's IP address.
 
-#### Custom Backend URL
+### SSL/TLS Configuration
 
-To point the frontend to a different backend:
+To enable SSL/TLS with Let's Encrypt:
 
-```bash
-# Use a custom backend URL
-RUNTIME_API_URL=http://api.example.com:8080 docker-compose up -d
+1. Modify `docker-compose.yml` to add certificate resolver:
+
+```yaml
+traefik:
+  command:
+    - "--api.insecure=true"
+    - "--providers.docker=true"
+    - "--providers.docker.exposedbydefault=false"
+    - "--entrypoints.web.address=:80"
+    - "--entrypoints.websecure.address=:443"
+    - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+    - "--certificatesresolvers.myresolver.acme.email=your-email@example.com"
+    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./letsencrypt:/letsencrypt
 ```
 
-Or in your `.env` file:
+2. Update resume-matcher labels:
 
-```env
-RUNTIME_API_URL=http://custom-backend:9000
+```yaml
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.resume-matcher.rule=Host(`resume.example.com`)"
+  - "traefik.http.routers.resume-matcher.entrypoints=websecure"
+  - "traefik.http.routers.resume-matcher.tls.certresolver=myresolver"
 ```
 
-#### Changing Ports
+### Traefik Dashboard
 
-Ports can now be changed without rebuilding:
+The Traefik dashboard is available at http://localhost:8080 and provides:
 
-```bash
-# Run on custom ports
-FRONTEND_PORT=4000 BACKEND_PORT=9000 docker-compose up -d
-```
-
-The frontend will automatically use the correct API URL via the proxy path.
+- Real-time service status
+- Active routers and middleware
+- Health check status
+- Request metrics
 
 ---
 
@@ -160,11 +229,8 @@ The frontend will automatically use the correct API URL via the proxy path.
 # Build the image locally
 docker-compose build
 
-# Or with custom build args
-docker build \
-  --build-arg NEXT_PUBLIC_API_URL=/api_be \
-  -t resume-matcher:local \
-  .
+# Or with Docker directly
+docker build -t resume-matcher:local .
 ```
 
 ### GitHub Actions Workflow
@@ -186,42 +252,33 @@ The workflow can also be manually triggered via GitHub Actions UI.
 
 ## Environment Variables
 
-### Runtime Variables (No Rebuild Needed)
-
-These variables can be changed by restarting the container:
+### LLM Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FRONTEND_PORT` | `3000` | Host port for the frontend |
-| `BACKEND_PORT` | `8000` | Host port for the backend API |
-| `RUNTIME_API_URL` | `/api_be` | Frontend API URL (supports runtime change) |
-| `LLM_PROVIDER` | — | AI provider (openai, anthropic, etc.) |
+| `LLM_PROVIDER` | — | AI provider (openai, anthropic, gemini, deepseek, ollama, openrouter) |
 | `LLM_MODEL` | — | AI model to use |
 | `LLM_API_KEY` | — | API key for LLM provider |
 | `LLM_API_BASE` | — | Custom API endpoint URL |
 
-### Build-Time Variables (Rebuild Required)
+### Traefik Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | `/api_be` | Fallback API URL baked into JS bundle |
+| `DOMAIN` | `localhost` | Domain name for the application |
 
 ### Example Configuration
 
 Create a `.env` file in the project root:
 
 ```env
-# Ports
-FRONTEND_PORT=3000
-BACKEND_PORT=8000
-
-# API Configuration (runtime configurable!)
-RUNTIME_API_URL=/api_be
-
 # LLM Configuration
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-4
 LLM_API_KEY=sk-your-api-key-here
+
+# Custom domain (optional)
+DOMAIN=localhost
 
 # For Ollama on host machine
 # LLM_API_BASE=http://host.docker.internal:11434
@@ -237,58 +294,113 @@ docker-compose up -d
 
 ## Troubleshooting
 
+### Issue: Cannot access the application
+
+**Solution 1: Check Traefik status**
+```bash
+# Check if Traefik is running
+docker ps | grep traefik
+
+# View Traefik logs
+docker logs traefik
+
+# Check Traefik dashboard
+curl http://localhost:8080/api/http/routers
+```
+
+**Solution 2: Verify resume-matcher is healthy**
+```bash
+# Check container status
+docker ps
+
+# View resume-matcher logs
+docker-compose logs -f resume-matcher
+
+# Check health status
+docker inspect resume-matcher | jq '.[0].State.Health'
+```
+
+**Solution 3: Verify network connectivity**
+```bash
+# Check if services are on the same network
+docker network inspect resume-matcher_default
+```
+
 ### Issue: Frontend can't connect to backend
 
-**Solution 1: Check the logs**
+This should not occur with Unix socket architecture, but if you see errors:
+
+**Solution 1: Check Unix socket**
 ```bash
-docker-compose logs -f
+# Exec into container
+docker exec -it resume-matcher sh
+
+# Check if socket exists
+ls -la /run/backend.sock
+
+# Test socket connectivity
+curl --unix-socket /run/backend.sock http://localhost/api/v1/health
 ```
 
-**Solution 2: Verify environment variables**
+**Solution 2: Check backend logs**
 ```bash
-docker-compose config
+docker-compose logs -f resume-matcher | grep backend
 ```
 
-**Solution 3: Use the default proxy path**
+### Issue: Traefik dashboard not accessible
+
+**Solution:**
 ```bash
-# Set/reset to default proxy path
-RUNTIME_API_URL=/api_be docker-compose up -d
+# Ensure port 8080 is not already in use
+lsof -i :8080
+
+# Check Traefik configuration
+docker-compose config | grep -A 10 traefik
 ```
 
-### Issue: Need to use a different backend port
+### Issue: SSL/TLS certificate errors
 
-**Old Way (Required Rebuild):**
+**Solution 1: Check certificate resolver**
 ```bash
-# DON'T DO THIS anymore
-BACKEND_PORT=9000 docker-compose build
-BACKEND_PORT=9000 docker-compose up -d
+# View certificate storage
+docker exec traefik cat /letsencrypt/acme.json
 ```
 
-**New Way (No Rebuild):**
+**Solution 2: Verify domain DNS**
 ```bash
-# Just restart with new port - API URL updates automatically
-BACKEND_PORT=9000 docker-compose up -d
+# Check DNS resolution
+nslookup resume.example.com
+
+# Verify domain is accessible
+curl -I http://resume.example.com
 ```
 
-### Issue: CORS errors when using custom API URL
+### Issue: Health checks failing
 
-If using a custom `RUNTIME_API_URL` with a different origin:
+**Solution:**
+```bash
+# Check backend is running
+docker exec resume-matcher ps aux | grep uvicorn
 
-1. Ensure the backend CORS settings allow your frontend origin
-2. Consider using the default `/api_be` proxy path instead
-3. If you must use a different origin, update backend CORS configuration
+# Test health endpoint directly
+docker exec resume-matcher curl --unix-socket /run/backend.sock http://localhost/api/v1/health
 
-### Issue: Changes to runtime config not taking effect
+# Check for socket permissions
+docker exec resume-matcher ls -la /run/backend.sock
+```
+
+### Issue: Changes not taking effect
 
 ```bash
 # Stop and remove containers
 docker-compose down
 
-# Start fresh
-docker-compose up -d
+# Remove volumes if needed (WARNING: deletes data)
+docker-compose down -v
 
-# Or restart the service
-docker-compose restart resume-matcher
+# Rebuild and start fresh
+docker-compose build
+docker-compose up -d
 ```
 
 ---
@@ -328,16 +440,37 @@ docker run --rm \
   alpine tar xzf /backup/resume-data-backup.tar.gz -C /
 ```
 
-### Health Checks
+### Multiple Instances with Load Balancing
 
-The Docker container includes health checks that monitor the backend API:
+To run multiple Resume Matcher instances:
 
-```bash
-# Check container health
-docker ps
+```yaml
+services:
+  traefik:
+    # ... traefik configuration ...
 
-# View health check logs
-docker inspect resume-matcher | jq '.[0].State.Health'
+  resume-matcher:
+    # ... configuration ...
+    deploy:
+      replicas: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.resume-matcher.rule=Host(`localhost`)"
+      - "traefik.http.services.resume-matcher.loadbalancer.server.port=3000"
+```
+
+### Monitoring and Metrics
+
+Enable Prometheus metrics in Traefik:
+
+```yaml
+traefik:
+  command:
+    # ... existing commands ...
+    - "--metrics.prometheus=true"
+    - "--metrics.prometheus.entrypoint=metrics"
+  ports:
+    - "8082:8082"  # Metrics port
 ```
 
 ---
@@ -347,4 +480,3 @@ docker inspect resume-matcher | jq '.[0].State.Health'
 For information about contributing to Resume Matcher, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 For questions or support, join our [Discord server](https://dsc.gg/resume-matcher).
-

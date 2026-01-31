@@ -6,13 +6,12 @@ const nextConfig: NextConfig = {
     turbopackUseSystemTlsCerts: true,
   },
   async rewrites() {
-    // Proxy /api_be requests to the backend server
-    // The actual backend URL is configured at runtime via RUNTIME_API_URL
-    // which defaults to http://localhost:8000 in the start.sh script
+    // Proxy /api requests to the backend Unix socket
+    // Backend runs on Unix socket at /run/backend.sock per FHS 3.0
     return [
       {
-        source: '/api_be/:path*',
-        destination: 'http://localhost:8000/:path*',
+        source: '/api/:path*',
+        destination: 'unix:/run/backend.sock:/api/:path*',
       },
     ];
   },
