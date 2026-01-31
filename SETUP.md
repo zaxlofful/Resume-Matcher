@@ -256,7 +256,7 @@ Ollama typically starts automatically after installation.
 
 ## Docker Deployment
 
-Prefer containerized deployment? Resume Matcher includes Docker support with runtime configuration.
+Prefer containerized deployment? Resume Matcher includes Docker support with Traefik integration for professional routing.
 
 ### Quick Start with Docker Compose
 
@@ -271,55 +271,41 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Customizing Ports and API URL
+Access the application at **http://localhost** (via Traefik on port 80).
 
-By default, Resume Matcher runs on ports 3000 (frontend) and 8000 (backend). The API URL is now configurable at runtime - **no rebuild required!**
+### Architecture
 
-**Option 1: Environment Variables (Recommended)**
-
-```bash
-# Change ports without rebuilding
-FRONTEND_PORT=4000 BACKEND_PORT=9000 docker-compose up -d
-```
-
-The frontend will automatically use the correct API URL via the `/api_be` proxy path.
-
-**Option 2: Custom API URL**
-
-If you need to point to a different backend (e.g., external server):
-
-```bash
-# Use custom API URL at runtime (no rebuild needed!)
-RUNTIME_API_URL=http://api.example.com:8080 docker-compose up -d
-```
-
-Or create a `.env` file:
-
-```bash
-# Create .env file
-cat > .env << EOF
-FRONTEND_PORT=4000
-BACKEND_PORT=9000
-RUNTIME_API_URL=/api_be
-LLM_PROVIDER=openai
-LLM_API_KEY=sk-your-key-here
-EOF
-
-# Run (no rebuild needed for port or API URL changes!)
-docker-compose up -d
-```
+Resume Matcher uses:
+- **Backend**: Runs on Unix socket (`/tmp/backend.sock`) for secure internal communication
+- **Frontend**: Runs on port 3000 internally
+- **Traefik**: Reverse proxy handling external traffic on ports 80/443
+- **Traefik Dashboard**: Available at http://localhost:8080
 
 ### Configuration Options
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FRONTEND_PORT` | `3000` | Host port for the web interface |
-| `BACKEND_PORT` | `8000` | Host port for the API |
-| `RUNTIME_API_URL` | `/api_be` | API URL (runtime configurable, no rebuild needed) |
-| `LLM_PROVIDER` | `openai` | AI provider (openai, anthropic, gemini, etc.) |
+| `DOMAIN` | `localhost` | Domain name for the application |
+| `LLM_PROVIDER` | — | AI provider (openai, anthropic, gemini, deepseek, ollama, openrouter) |
 | `LLM_MODEL` | — | Model to use (configured via Settings UI) |
 | `LLM_API_KEY` | — | API key (recommended: configure via Settings UI) |
 | `LLM_API_BASE` | — | Custom API endpoint (for Ollama or proxies) |
+
+Create a `.env` file:
+
+```bash
+cat > .env << EOF
+# Custom domain (optional)
+DOMAIN=localhost
+
+# LLM Configuration
+LLM_PROVIDER=openai
+LLM_API_KEY=sk-your-key-here
+EOF
+
+# Run with configuration
+docker-compose up -d
+```
 
 ### Using Ollama with Docker
 
@@ -329,6 +315,8 @@ To use Ollama running on your host machine:
 LLM_API_BASE=http://host.docker.internal:11434 docker-compose up -d
 ```
 
+Then configure Ollama as your provider in the Settings UI.
+
 ### Using Pre-built Images from GitHub Container Registry
 
 Resume Matcher images are automatically built and published to GitHub Container Registry:
@@ -336,12 +324,15 @@ Resume Matcher images are automatically built and published to GitHub Container 
 > **Note**: Images are published to the repository owner's container registry. Replace `zaxlofful` with the appropriate repository owner if using a different fork.
 
 ```bash
-# Pull and run the latest image
+# Pull the latest image
 docker pull ghcr.io/zaxlofful/resume-matcher:latest
-docker run -p 3000:3000 -p 8000:8000 ghcr.io/zaxlofful/resume-matcher:latest
 
-# Or use docker-compose with pre-built image
-# Edit docker-compose.yml to use: image: ghcr.io/zaxlofful/resume-matcher:latest
+# Edit docker-compose.yml to use pre-built image
+# Change 'build:' section to:
+#   image: ghcr.io/zaxlofful/resume-matcher:latest
+
+# Start with pre-built image
+docker-compose up -d
 ```
 
 Available tags:
@@ -349,14 +340,15 @@ Available tags:
 - `v*.*.*` - Specific version releases
 - `main-{sha}` - Builds from specific commits
 
-Then configure Ollama as your provider in the Settings UI.
-
 ### Important Notes
 
-- **API keys are best configured through the UI** at `http://localhost:3000/settings`
-- Data is persisted in a Docker volume (`resume-data`)
-- The Settings UI configuration is stored in the volume and persists across restarts
-- **Backend port changes require a rebuild** - the frontend API URL is baked into the JS bundle at build time
+- **Access via Traefik**: Frontend is accessed through http://localhost (port 80)
+- **No direct port exposure**: Backend runs on Unix socket for security
+- **API keys**: Best configured through the UI at `/settings`
+- **Data persistence**: Data is persisted in a Docker volume (`resume-data`)
+- **Settings**: Configuration stored in volume and persists across restarts
+
+For detailed Docker documentation, see [DOCKER.md](DOCKER.md).
 
 
 
@@ -364,13 +356,22 @@ Then configure Ollama as your provider in the Settings UI.
 
 Once both servers are running, open your browser:
 
+### Local Development
+
 | URL | Description |
 |-----|-------------|
 | **<http://localhost:3000>** | Main application (Dashboard) |
 | **<http://localhost:3000/settings>** | Configure AI provider |
 | **<http://localhost:8000>** | Backend API root |
 | **<http://localhost:8000/docs>** | Interactive API documentation |
-| **<http://localhost:8000/health>** | Backend health check |
+| **<http://localhost:8000/api/v1/health>** | Backend health check |
+
+### Docker Deployment
+
+| URL | Description |
+|-----|-------------|
+| **<http://localhost>** | Main application (via Traefik on port 80) |
+| **<http://localhost:8080>** | Traefik dashboard |
 
 ### First-Time Setup Checklist
 
