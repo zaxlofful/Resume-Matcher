@@ -4,15 +4,52 @@
  * Single source of truth for API configuration and base fetch utilities.
  */
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-export const API_BASE = `${API_URL}/api/v1`;
+// Runtime configuration support
+// Reads from window.__RUNTIME_CONFIG__ which is injected via /config.js at startup
+// Defaults to /api_be proxy path for same-origin requests
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: {
+      API_URL?: string;
+    };
+  }
+}
+
+function getApiUrl(): string {
+  // In browser, check runtime config
+  if (typeof window !== 'undefined' && window.__RUNTIME_CONFIG__?.API_URL) {
+    return window.__RUNTIME_CONFIG__.API_URL;
+  }
+  // Default to /api_be proxy path
+  return '/api_be';
+}
+
+// Export as getter functions to support runtime configuration
+export function getAPIUrl(): string {
+  return getApiUrl();
+}
+
+export function getAPIBase(): string {
+  return `${getApiUrl()}/api/v1`;
+}
+
+// Legacy constant exports for backward compatibility.
+// NOTE: These are evaluated once at module load time:
+// - On the client, they reflect runtime config from window.__RUNTIME_CONFIG__
+//   which is set by config.js before hydration
+// - On the server (SSR/API routes), window is not available, so they will
+//   use the default /api_be proxy path
+// Prefer using getAPIUrl() / getAPIBase() in new code for consistency.
+export const API_URL = getApiUrl();
+export const API_BASE = getAPIBase();
 
 /**
  * Standard fetch wrapper with common error handling.
  * Returns the Response object for flexibility.
  */
 export async function apiFetch(endpoint: string, options?: RequestInit): Promise<Response> {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const apiBase = getAPIBase();
+  const url = endpoint.startsWith('http') ? endpoint : `${apiBase}${endpoint}`;
   return fetch(url, options);
 }
 
@@ -60,5 +97,5 @@ export async function apiDelete(endpoint: string): Promise<Response> {
  * Builds the full upload URL for file uploads.
  */
 export function getUploadUrl(): string {
-  return `${API_BASE}/resumes/upload`;
+  return `${getAPIBase()}/resumes/upload`;
 }

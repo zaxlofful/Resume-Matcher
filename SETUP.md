@@ -256,7 +256,7 @@ Ollama typically starts automatically after installation.
 
 ## Docker Deployment
 
-Prefer containerized deployment? Resume Matcher includes Docker support.
+Prefer containerized deployment? Resume Matcher includes Docker support with runtime configuration.
 
 ### Quick Start with Docker Compose
 
@@ -271,42 +271,42 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Customizing Ports
+### Customizing Ports and API URL
 
-By default, Resume Matcher runs on ports 3000 (frontend) and 8000 (backend). To use different ports:
+By default, Resume Matcher runs on ports 3000 (frontend) and 8000 (backend). The API URL is now configurable at runtime - **no rebuild required!**
 
-**Option 1: Environment Variables (Frontend port only)**
-
-```bash
-# Change frontend port only (no rebuild needed)
-FRONTEND_PORT=4000 docker-compose up -d
-```
-
-**Option 2: Changing the Backend Port (requires rebuild)**
-
-The frontend's API URL is baked into the JavaScript bundle at build time. If you change `BACKEND_PORT`, you must rebuild the image:
+**Option 1: Environment Variables (Recommended)**
 
 ```bash
-# Build with custom backend port
-BACKEND_PORT=9000 docker-compose build
-
-# Then run with the same port
-BACKEND_PORT=9000 docker-compose up -d
+# Change ports without rebuilding
+FRONTEND_PORT=4000 BACKEND_PORT=9000 docker-compose up -d
 ```
 
-Or create a `.env` file and rebuild:
+The frontend will automatically use the correct API URL via the `/api_be` proxy path.
+
+**Option 2: Custom API URL**
+
+If you need to point to a different backend (e.g., external server):
+
+```bash
+# Use custom API URL at runtime (no rebuild needed!)
+RUNTIME_API_URL=http://api.example.com:8080 docker-compose up -d
+```
+
+Or create a `.env` file:
 
 ```bash
 # Create .env file
 cat > .env << EOF
 FRONTEND_PORT=4000
 BACKEND_PORT=9000
+RUNTIME_API_URL=/api_be
 LLM_PROVIDER=openai
 LLM_API_KEY=sk-your-key-here
 EOF
 
-# Rebuild and run
-docker-compose build && docker-compose up -d
+# Run (no rebuild needed for port or API URL changes!)
+docker-compose up -d
 ```
 
 ### Configuration Options
@@ -315,6 +315,7 @@ docker-compose build && docker-compose up -d
 |----------|---------|-------------|
 | `FRONTEND_PORT` | `3000` | Host port for the web interface |
 | `BACKEND_PORT` | `8000` | Host port for the API |
+| `RUNTIME_API_URL` | `/api_be` | API URL (runtime configurable, no rebuild needed) |
 | `LLM_PROVIDER` | `openai` | AI provider (openai, anthropic, gemini, etc.) |
 | `LLM_MODEL` | — | Model to use (configured via Settings UI) |
 | `LLM_API_KEY` | — | API key (recommended: configure via Settings UI) |
@@ -327,6 +328,26 @@ To use Ollama running on your host machine:
 ```bash
 LLM_API_BASE=http://host.docker.internal:11434 docker-compose up -d
 ```
+
+### Using Pre-built Images from GitHub Container Registry
+
+Resume Matcher images are automatically built and published to GitHub Container Registry:
+
+> **Note**: Images are published to the repository owner's container registry. Replace `zaxlofful` with the appropriate repository owner if using a different fork.
+
+```bash
+# Pull and run the latest image
+docker pull ghcr.io/zaxlofful/resume-matcher:latest
+docker run -p 3000:3000 -p 8000:8000 ghcr.io/zaxlofful/resume-matcher:latest
+
+# Or use docker-compose with pre-built image
+# Edit docker-compose.yml to use: image: ghcr.io/zaxlofful/resume-matcher:latest
+```
+
+Available tags:
+- `latest` - Latest stable build from main branch
+- `v*.*.*` - Specific version releases
+- `main-{sha}` - Builds from specific commits
 
 Then configure Ollama as your provider in the Settings UI.
 

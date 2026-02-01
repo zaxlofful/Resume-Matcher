@@ -3,12 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Build args for customizing the frontend API URL at build time
-      # IMPORTANT: NEXT_PUBLIC_API_URL is baked into the JS bundle during build.
-      # If you change BACKEND_PORT, you must rebuild with matching NEXT_PUBLIC_API_URL:
-      #   BACKEND_PORT=9000 docker-compose build --build-arg NEXT_PUBLIC_API_URL=http://localhost:9000
-      args:
-        - NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT:-8000}
     image: resume-matcher
     container_name: resume-matcher
     # Port mapping: HOST_PORT:CONTAINER_PORT
@@ -23,6 +17,10 @@ services:
       # Pass port configuration to container for internal use
       - FRONTEND_PORT=${FRONTEND_PORT:-3000}
       - BACKEND_PORT=${BACKEND_PORT:-8000}
+      # Runtime API URL - can be customized at runtime (no rebuild needed)
+      # Default: /api_be uses Next.js proxy for same-origin requests (avoids CORS)
+      # Override to use direct backend URL: RUNTIME_API_URL=http://localhost:8000
+      - RUNTIME_API_URL=${RUNTIME_API_URL:-/api_be}
       # LLM Configuration - configure via Settings UI or set env vars for explicit overrides
       # Supported providers: openai, anthropic, openrouter, gemini, deepseek, ollama
       # Defaults are defined in apps/backend/app/config.py

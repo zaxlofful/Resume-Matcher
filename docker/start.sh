@@ -14,6 +14,19 @@ BOLD='\033[1m'
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 
+# API URL configuration for runtime injection
+# Default: Use /api_be proxy path for same-origin requests (avoids CORS)
+# Can be overridden with RUNTIME_API_URL env var for custom backends
+RUNTIME_API_URL="${RUNTIME_API_URL:-/api_be}"
+
+# Validate RUNTIME_API_URL to prevent injection attacks
+# Allow: alphanumeric, /, :, ., -, _
+if ! echo "$RUNTIME_API_URL" | grep -qE '^[a-zA-Z0-9/:._-]+$'; then
+    error "Invalid RUNTIME_API_URL: contains dangerous characters"
+    error "RUNTIME_API_URL must only contain: a-z A-Z 0-9 / : . - _"
+    exit 1
+fi
+
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
@@ -86,7 +99,24 @@ print_banner
 info "Port configuration:"
 echo -e "  Frontend port: ${BOLD}${FRONTEND_PORT}${NC}"
 echo -e "  Backend port:  ${BOLD}${BACKEND_PORT}${NC}"
+echo -e "  API URL:       ${BOLD}${RUNTIME_API_URL}${NC}"
 echo ""
+
+# Generate runtime configuration for frontend
+info "Generating runtime configuration..."
+
+# Escape single quotes in the URL for safe JavaScript injection
+# printf '%s\n' outputs the value, which is then piped to sed for single-quote escaping
+ESCAPED_API_URL=$(printf '%s\n' "$RUNTIME_API_URL" | sed "s/'/'\\\\''/g")
+
+cat > /app/frontend/public/config.js << EOF
+// Runtime configuration - generated at startup
+// API_URL can be customized via RUNTIME_API_URL environment variable
+window.__RUNTIME_CONFIG__ = {
+  API_URL: '${ESCAPED_API_URL}'
+};
+EOF
+status "Runtime configuration generated"
 
 # Check and create data directory
 info "Checking data directory..."
