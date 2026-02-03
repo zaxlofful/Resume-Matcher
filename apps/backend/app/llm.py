@@ -15,6 +15,9 @@ LLM_TIMEOUT_HEALTH_CHECK = 30
 LLM_TIMEOUT_COMPLETION = 120
 LLM_TIMEOUT_JSON = 180  # JSON completions may take longer
 
+# GitHub Copilot OAuth configuration
+COPILOT_TOKEN_CACHE_EXPIRY_HOURS = 1  # OAuth tokens cached for bearer token exchange
+
 # LLM-004: OpenRouter JSON-capable models (explicit allowlist)
 OPENROUTER_JSON_CAPABLE_MODELS = {
     # Anthropic models
@@ -257,6 +260,7 @@ def get_model_name(config: LLMConfig) -> str:
         "gemini": "gemini/",
         "deepseek": "deepseek/",
         "ollama": "ollama/",
+        "github-copilot": "github_copilot/",
     }
 
     prefix = provider_prefixes.get(config.provider, "")
@@ -269,7 +273,7 @@ def get_model_name(config: LLMConfig) -> str:
         return f"openrouter/{config.model}"
 
     # For other providers, don't add prefix if model already has a known prefix
-    known_prefixes = ["openrouter/", "anthropic/", "gemini/", "deepseek/", "ollama/"]
+    known_prefixes = ["openrouter/", "anthropic/", "gemini/", "deepseek/", "ollama/", "github_copilot/"]
     if any(config.model.startswith(p) for p in known_prefixes):
         return config.model
 
