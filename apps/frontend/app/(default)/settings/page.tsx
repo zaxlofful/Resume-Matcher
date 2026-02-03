@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dropdown } from '@/components/ui/dropdown';
+import { CopilotAuthFlow } from '@/components/copilot-auth-flow';
 import {
   Save,
   Key,
@@ -99,6 +100,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('');
   const [apiBase, setApiBase] = useState('');
   const [hasStoredApiKey, setHasStoredApiKey] = useState(false);
+  const [showCopilotAuthFlow, setShowCopilotAuthFlow] = useState(false);
 
   // Use cached system status (loaded on app start, refreshes every 30 min)
   const {
@@ -293,6 +295,7 @@ export default function SettingsPage() {
     // Clear API key input when switching providers to avoid accidental cross-provider usage.
     setApiKey('');
     setHasStoredApiKey(false);
+    setShowCopilotAuthFlow(false); // Close Copilot auth flow when switching providers
   };
 
   // Save configuration
@@ -755,35 +758,78 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* API Key Input */}
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">
-                  {t('settings.llmConfiguration.apiKeyLabel')}{' '}
-                  {!requiresApiKey && (
-                    <span className="text-gray-400">
-                      {t('settings.llmConfiguration.apiKeyOptionalForOllama')}
-                    </span>
+              {/* API Key Input / GitHub Copilot Auth */}
+              {provider === 'github-copilot' ? (
+                <div className="space-y-2">
+                  <Label>{t('settings.llmConfiguration.apiKeyLabel')}</Label>
+                  {showCopilotAuthFlow ? (
+                    <CopilotAuthFlow
+                      onSuccess={(token) => {
+                        setApiKey(token);
+                        setShowCopilotAuthFlow(false);
+                        setStatus('idle');
+                        // Optionally auto-save after successful authentication
+                        handleSave();
+                      }}
+                      onCancel={() => {
+                        setShowCopilotAuthFlow(false);
+                      }}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => setShowCopilotAuthFlow(true)}
+                        className="w-full"
+                        variant={hasStoredApiKey ? 'outline' : 'default'}
+                      >
+                        <Key className="w-4 h-4 mr-2" />
+                        {hasStoredApiKey
+                          ? 'Re-authenticate with GitHub Copilot'
+                          : 'Sign in with GitHub Copilot'}
+                      </Button>
+                      {hasStoredApiKey && (
+                        <p className="text-xs text-green-600 font-mono flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          GitHub Copilot token is configured
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 font-mono">
+                        Authenticate with your GitHub account to use GitHub Copilot models. Requires
+                        an active GitHub Copilot subscription.
+                      </p>
+                    </div>
                   )}
-                </Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={
-                    requiresApiKey
-                      ? t('settings.llmConfiguration.apiKeyPlaceholder')
-                      : t('settings.llmConfiguration.apiKeyNotRequiredPlaceholder')
-                  }
-                  className="font-mono"
-                  disabled={!requiresApiKey}
-                />
-                {requiresApiKey && hasStoredApiKey && !apiKey && (
-                  <p className="text-xs text-gray-500 font-mono">
-                    {t('settings.llmConfiguration.leaveBlankToKeepExistingKey')}
-                  </p>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">
+                    {t('settings.llmConfiguration.apiKeyLabel')}{' '}
+                    {!requiresApiKey && (
+                      <span className="text-gray-400">
+                        {t('settings.llmConfiguration.apiKeyOptionalForOllama')}
+                      </span>
+                    )}
+                  </Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={
+                      requiresApiKey
+                        ? t('settings.llmConfiguration.apiKeyPlaceholder')
+                        : t('settings.llmConfiguration.apiKeyNotRequiredPlaceholder')
+                    }
+                    className="font-mono"
+                    disabled={!requiresApiKey}
+                  />
+                  {requiresApiKey && hasStoredApiKey && !apiKey && (
+                    <p className="text-xs text-gray-500 font-mono">
+                      {t('settings.llmConfiguration.leaveBlankToKeepExistingKey')}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* API Base URL (optional, for proxies/aggregators/custom endpoints) */}
               <div className="space-y-2">
