@@ -38,7 +38,12 @@ export function CopilotAuthFlow({ onSuccess, onCancel }: CopilotAuthFlowProps) {
       setStatus('waiting');
 
       // Auto-open verification URL in a new window
-      window.open(response.verification_uri, '_blank', 'width=600,height=800');
+      const popup = window.open(response.verification_uri, '_blank', 'width=600,height=800');
+      
+      // Check if popup was blocked
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        console.warn('Popup was blocked. User will need to click the link manually.');
+      }
 
       // Start polling for token
       pollForToken(response.device_code, response.interval);
@@ -119,10 +124,16 @@ export function CopilotAuthFlow({ onSuccess, onCancel }: CopilotAuthFlowProps) {
   }, [status, countdown]);
 
   // Copy to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback: show alert if clipboard write fails
+      console.error('Failed to copy to clipboard:', err);
+      alert(`Failed to copy. Please manually copy this code: ${text}`);
+    }
   };
 
   // Format time remaining

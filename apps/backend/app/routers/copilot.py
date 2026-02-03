@@ -1,4 +1,12 @@
-"""GitHub Copilot OAuth device flow endpoints."""
+"""GitHub Copilot OAuth device flow endpoints.
+
+WARNING: This implementation uses in-memory storage for device codes, which means:
+1. Tokens are lost on server restart
+2. Not suitable for multi-instance deployments
+3. For production use, implement persistent storage (Redis, database)
+
+This is acceptable for single-user, local deployments.
+"""
 
 import asyncio
 import logging
@@ -13,6 +21,7 @@ from app.schemas import (
     CopilotTokenPollRequest,
     CopilotTokenPollResponse,
 )
+from app.llm import COPILOT_TOKEN_CACHE_EXPIRY_HOURS
 
 router = APIRouter(prefix="/config/copilot", tags=["GitHub Copilot OAuth"])
 
@@ -115,7 +124,7 @@ async def poll_for_token(request: CopilotTokenPollRequest) -> CopilotTokenPollRe
                 # Cache the token for bearer token exchange
                 _token_cache[request.device_code] = {
                     "access_token": access_token,
-                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=COPILOT_TOKEN_CACHE_EXPIRY_HOURS),
                 }
                 
                 return CopilotTokenPollResponse(
