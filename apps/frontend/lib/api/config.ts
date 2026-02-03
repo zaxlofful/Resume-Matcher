@@ -1,7 +1,7 @@
 import { apiFetch } from './client';
 
 // Supported LLM providers
-export type LLMProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'deepseek' | 'ollama';
+export type LLMProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'deepseek' | 'ollama' | 'github-copilot';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -134,6 +134,7 @@ export const PROVIDER_INFO: Record<
   gemini: { name: 'Google Gemini', defaultModel: 'gemini-3-flash-preview', requiresKey: true },
   deepseek: { name: 'DeepSeek', defaultModel: 'deepseek-v3.2', requiresKey: true },
   ollama: { name: 'Ollama (Local)', defaultModel: 'gemma3:4b', requiresKey: false },
+  'github-copilot': { name: 'GitHub Copilot', defaultModel: 'gpt-4o', requiresKey: true },
 };
 
 // Feature configuration types
@@ -363,4 +364,75 @@ export async function resetDatabase(): Promise<void> {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || `Failed to reset database (status ${res.status}).`);
   }
+}
+
+// GitHub Copilot OAuth types
+export interface CopilotDeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export interface CopilotTokenPollResponse {
+  status: 'pending' | 'success' | 'expired' | 'error';
+  access_token?: string;
+  error?: string;
+}
+
+export interface CopilotBearerTokenResponse {
+  token: string;
+  expires_at?: number;
+}
+
+// Initiate GitHub Copilot device flow
+export async function initiateCopilotDeviceFlow(): Promise<CopilotDeviceCodeResponse> {
+  const res = await apiFetch('/config/copilot/device-code', {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to initiate Copilot authentication (status ${res.status}).`);
+  }
+
+  return res.json();
+}
+
+// Poll for Copilot OAuth token
+export async function pollCopilotToken(deviceCode: string): Promise<CopilotTokenPollResponse> {
+  const res = await apiFetch('/config/copilot/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ device_code: deviceCode }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to check authorization status (status ${res.status}).`);
+  }
+
+  return res.json();
+}
+
+// Exchange OAuth token for Copilot bearer token
+export async function exchangeCopilotBearerToken(
+  deviceCode: string
+): Promise<CopilotBearerTokenResponse> {
+  const res = await apiFetch('/config/copilot/bearer-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ device_code: deviceCode }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      data.detail || `Failed to obtain Copilot token (status ${res.status}).`
+    );
+  }
+
+  return res.json();
 }

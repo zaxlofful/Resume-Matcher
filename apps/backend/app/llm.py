@@ -257,6 +257,7 @@ def get_model_name(config: LLMConfig) -> str:
         "gemini": "gemini/",
         "deepseek": "deepseek/",
         "ollama": "ollama/",
+        "github-copilot": "github_copilot/",
     }
 
     prefix = provider_prefixes.get(config.provider, "")
@@ -269,7 +270,7 @@ def get_model_name(config: LLMConfig) -> str:
         return f"openrouter/{config.model}"
 
     # For other providers, don't add prefix if model already has a known prefix
-    known_prefixes = ["openrouter/", "anthropic/", "gemini/", "deepseek/", "ollama/"]
+    known_prefixes = ["openrouter/", "anthropic/", "gemini/", "deepseek/", "ollama/", "github_copilot/"]
     if any(config.model.startswith(p) for p in known_prefixes):
         return config.model
 

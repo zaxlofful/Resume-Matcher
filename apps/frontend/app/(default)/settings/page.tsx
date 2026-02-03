@@ -61,6 +61,7 @@ const PROVIDERS: LLMProvider[] = [
   'gemini',
   'deepseek',
   'ollama',
+  'github-copilot',
 ];
 
 const unwrapCodeBlock = (value?: string | null): string | null => {

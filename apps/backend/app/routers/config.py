@@ -321,7 +321,7 @@ async def update_prompt_config(
 
 
 # Supported API key providers
-SUPPORTED_PROVIDERS = ["openai", "anthropic", "google", "openrouter", "deepseek"]
+SUPPORTED_PROVIDERS = ["openai", "anthropic", "google", "openrouter", "deepseek", "github-copilot"]
 
 
 def _mask_key_short(key: str | None) -> str | None:
@@ -401,6 +401,13 @@ async def update_api_keys(request: ApiKeysUpdateRequest) -> ApiKeysUpdateRespons
         elif "deepseek" in stored_keys:
             del stored_keys["deepseek"]
         updated.append("deepseek")
+
+    if request.github_copilot is not None:
+        if request.github_copilot:
+            stored_keys["github-copilot"] = request.github_copilot
+        elif "github-copilot" in stored_keys:
+            del stored_keys["github-copilot"]
+        updated.append("github-copilot")
 
     save_api_keys_to_config(stored_keys)
 

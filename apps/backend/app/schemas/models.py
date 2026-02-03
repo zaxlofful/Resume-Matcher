@@ -477,6 +477,7 @@ class ApiKeysUpdateRequest(BaseModel):
     google: str | None = None
     openrouter: str | None = None
     deepseek: str | None = None
+    github_copilot: str | None = None
 
 
 class ApiKeysUpdateResponse(BaseModel):
@@ -528,3 +529,35 @@ class StatusResponse(BaseModel):
     llm_healthy: bool
     has_master_resume: bool
     database_stats: dict[str, Any]
+
+
+# GitHub Copilot OAuth Models
+class CopilotDeviceCodeResponse(BaseModel):
+    """Response from initiating GitHub Copilot device flow."""
+
+    device_code: str
+    user_code: str
+    verification_uri: str
+    expires_in: int
+    interval: int
+
+
+class CopilotTokenPollRequest(BaseModel):
+    """Request to poll for OAuth token."""
+
+    device_code: str
+
+
+class CopilotTokenPollResponse(BaseModel):
+    """Response from polling for OAuth token."""
+
+    status: Literal["pending", "success", "expired", "error"]
+    access_token: str | None = None
+    error: str | None = None
+
+
+class CopilotBearerTokenResponse(BaseModel):
+    """Response containing Copilot bearer token."""
+
+    token: str
+    expires_at: int | None = None
