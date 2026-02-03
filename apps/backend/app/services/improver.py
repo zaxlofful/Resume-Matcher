@@ -21,15 +21,43 @@ from app.schemas import ResumeData, ResumeFieldDiff, ResumeDiffSummary
 logger = logging.getLogger(__name__)
 
 # LLM-011: Prompt injection patterns to sanitize
+# Extended pattern list for comprehensive protection
 _INJECTION_PATTERNS = [
+    # Instruction override attempts
     r"ignore\s+(all\s+)?previous\s+instructions",
     r"disregard\s+(all\s+)?above",
     r"forget\s+(everything|all)",
     r"new\s+instructions?:",
+    r"override\s+(previous\s+)?instructions?",
+    r"do\s+not\s+follow\s+(the\s+)?(previous|above)",
+    # System prompt extraction attempts
     r"system\s*:",
     r"<\s*/?\s*system\s*>",
+    r"what\s+(is|are)\s+(your|the)\s+(system\s+)?prompt",
+    r"repeat\s+(your\s+)?instructions",
+    r"show\s+(me\s+)?(your\s+)?(system\s+)?prompt",
+    r"print\s+(your\s+)?instructions",
+    # Model-specific injection markers
     r"\[\s*INST\s*\]",
     r"\[\s*/\s*INST\s*\]",
+    r"<\|im_start\|>",
+    r"<\|im_end\|>",
+    r"<<SYS>>",
+    r"<</SYS>>",
+    # Role-play escape attempts
+    r"pretend\s+(you\s+are|to\s+be)\s+a",
+    r"act\s+as\s+(if\s+you\s+(are|were)\s+)?",
+    r"you\s+are\s+now\s+(a\s+)?different",
+    r"jailbreak",
+    r"dan\s+mode",
+    # Output manipulation
+    r"output\s+only\s+(the\s+)?following",
+    r"respond\s+with\s+only",
+    # Code execution attempts (shouldn't happen but defensive)
+    # \s* matches all whitespace including \r\n
+    r"```python\s*import\s+os",
+    r"```\s*eval\(",
+    r"```\s*exec\(",
 ]
 
 
@@ -40,12 +68,30 @@ class DiffConfidence:
     modified: str
 
 
+def _normalize_unicode(text: str) -> str:
+    """LLM-012: Normalize Unicode to prevent homoglyph attacks.
+
+    Converts various Unicode representations to canonical ASCII-compatible forms
+    to prevent attacks using look-alike characters.
+    """
+    import unicodedata
+
+    # Normalize to NFKC (compatibility decomposition + canonical composition)
+    # This handles things like fullwidth characters, superscripts, etc.
+    normalized = unicodedata.normalize("NFKC", text)
+    return normalized
+
+
 def _sanitize_user_input(text: str) -> str:
     """LLM-011: Sanitize user input to prevent prompt injection.
 
     Removes or redacts common injection patterns that could manipulate LLM behavior.
+    Applies Unicode normalization first to prevent homoglyph attacks.
     """
-    sanitized = text
+    # LLM-012: Normalize Unicode first to catch obfuscated injection attempts
+    sanitized = _normalize_unicode(text)
+
+    # Apply pattern-based sanitization
     for pattern in _INJECTION_PATTERNS:
         sanitized = re.sub(pattern, "[REDACTED]", sanitized, flags=re.IGNORECASE)
     return sanitized

@@ -57,12 +57,17 @@ def _save_config(config: dict) -> None:
 
 
 def _mask_api_key(key: str) -> str:
-    """Mask API key for display."""
+    """Mask API key for display.
+
+    SEC-002: Enhanced masking to prevent partial key exposure.
+    Only reveals last 4 characters to allow users to identify which key is configured.
+    """
     if not key:
         return ""
-    if len(key) <= 8:
+    if len(key) <= 4:
         return "*" * len(key)
-    return key[:4] + "*" * (len(key) - 8) + key[-4:]
+    # Only show last 4 characters - enough to identify the key, not enough to brute force
+    return "*" * (len(key) - 4) + key[-4:]
 
 
 def _get_prompt_options() -> list[PromptOption]:
