@@ -59,25 +59,27 @@ async def reset_database_endpoint(request: ResetDatabaseRequest) -> dict:
 
 **Issue**: API keys are stored in plain text in `config.json` file and partially exposed via API endpoints.
 
-**Evidence**:
+**Evidence** (Original - Now Fixed):
 ```python
-# apps/backend/app/routers/config.py:59-65
+# apps/backend/app/routers/config.py - BEFORE (exposed first 4 + last 4 chars)
 def _mask_api_key(key: str) -> str:
-    """Mask API key for display."""
-    if not key:
-        return ""
-    if len(key) <= 8:
+    return key[:4] + "*" * (len(key) - 8) + key[-4:]
+
+# AFTER (only exposes last 4 chars)
+def _mask_api_key(key: str) -> str:
+    """SEC-002: Enhanced masking to prevent partial key exposure."""
+    if len(key) <= 4:
         return "*" * len(key)
-    return key[:4] + "*" * (len(key) - 8) + key[-4:]  # Exposes first 4 and last 4 chars
+    return "*" * (len(key) - 4) + key[-4:]  # Only last 4 chars visible
 ```
 
-**Risks**:
-- First 4 and last 4 characters revealed (helpful for brute force)
-- Keys stored in plain text on disk
-- No encryption at rest
-- File permissions not enforced
+**Risks** (Partially Mitigated):
+- ~~First 4 and last 4 characters revealed~~ **FIXED**: Only last 4 chars now visible
+- Keys stored in plain text on disk (still a concern)
+- No encryption at rest (still a concern)
+- File permissions not enforced (still a concern)
 
-**Mitigation Priority**: HIGH
+**Mitigation Priority**: MEDIUM (masking improved, storage encryption still needed)
 
 ---
 
@@ -106,68 +108,86 @@ app.add_middleware(
 
 ## High-Risk Areas
 
-### 4. LLM Prompt Injection (Partially Mitigated)
+### 4. LLM Prompt Injection (Significantly Improved)
 
 **Location**: `apps/backend/app/services/improver.py`, `apps/backend/app/llm.py`
 
-**Issue**: User-provided job descriptions are passed to LLM prompts. While basic sanitization exists, sophisticated attacks may bypass it.
+**Issue**: User-provided job descriptions are passed to LLM prompts. Sanitization has been significantly enhanced.
 
-**Evidence**:
+**Evidence** (After Improvements):
 ```python
-# apps/backend/app/services/improver.py:23-33
+# apps/backend/app/services/improver.py - ENHANCED with 30+ patterns
 _INJECTION_PATTERNS = [
+    # Instruction override attempts
     r"ignore\s+(all\s+)?previous\s+instructions",
-    r"disregard\s+(all\s+)?above",
-    r"forget\s+(everything|all)",
-    r"new\s+instructions?:",
-    r"system\s*:",
-    r"<\s*/?\s*system\s*>",
-    r"\[\s*INST\s*\]",
-    r"\[\s*/\s*INST\s*\]",
+    r"override\s+(previous\s+)?instructions?",
+    # System prompt extraction attempts
+    r"what\s+(is|are)\s+(your|the)\s+(system\s+)?prompt",
+    r"repeat\s+(your\s+)?instructions",
+    # Model-specific injection markers
+    r"<\|im_start\|>", r"<\|im_end\|>", r"<<SYS>>",
+    # Role-play escape attempts
+    r"pretend\s+(you\s+are|to\s+be)\s+a",
+    r"jailbreak", r"dan\s+mode",
+    # ... and many more
 ]
+
+# ADDED: Unicode normalization to prevent homoglyph attacks
+def _normalize_unicode(text: str) -> str:
+    return unicodedata.normalize("NFKC", text)
 ```
 
-**Gaps**:
-- Unicode obfuscation attacks not covered
+**Mitigations Applied**:
+- ✅ Unicode normalization (NFKC) added to catch obfuscated attacks
+- ✅ Role-play/jailbreak detection patterns added
+- ✅ Model-specific markers detected (Llama, GPT, etc.)
+- ✅ 30+ injection patterns vs original 8
+
+**Remaining Gaps**:
 - Base64 encoded instructions not detected
-- Jailbreak prompts using role-play scenarios not blocked
 - Indirect injection via resume content not sanitized
 
 **Threat Scenario**: Attacker crafts job description to extract system prompts, modify LLM behavior, or generate malicious content.
 
-**Mitigation Priority**: HIGH
+**Mitigation Priority**: MEDIUM (significantly improved)
 
 ---
 
-### 5. File Upload Vulnerabilities (MEDIUM-HIGH)
+### 5. File Upload Vulnerabilities (Improved)
 
-**Location**: `apps/backend/app/routers/resumes.py:298-379`
+**Location**: `apps/backend/app/routers/resumes.py`
 
-**Issue**: File uploads are processed with limited validation.
+**Issue**: File uploads were processed with limited validation. Now includes magic byte validation.
 
-**Evidence**:
+**Evidence** (After Improvements):
 ```python
-ALLOWED_TYPES = {
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+# SEC-001: Magic bytes for file type validation
+FILE_SIGNATURES = {
+    b"%PDF": {".pdf"},  # PDF files
+    b"PK\x03\x04": {".docx"},  # DOCX (ZIP-based Office Open XML)
+    b"\xd0\xcf\x11\xe0": {".doc"},  # Legacy DOC (OLE format)
 }
-MAX_FILE_SIZE = 4 * 1024 * 1024  # 4MB
 
-# Validation only checks content_type header (easily spoofed)
-if file.content_type not in ALLOWED_TYPES:
-    raise HTTPException(...)
+def _validate_file_signature(content: bytes, filename: str) -> bool:
+    """Validates file content matches expected magic bytes."""
+    # Requires extension to be present
+    # Verifies signature matches expected type
+    # Rejects unknown signatures
 ```
 
-**Risks**:
-- MIME type can be spoofed (polyglot files)
-- No magic byte validation
+**Mitigations Applied**:
+- ✅ Magic byte validation added (SEC-001)
+- ✅ Extension required for all uploads
+- ✅ Signature-extension matching enforced
+- ✅ Unknown signatures rejected
+
+**Remaining Risks**:
 - PDF/DOCX can contain malicious macros/scripts
-- `markitdown` library processes untrusted files
+- `markitdown` library processes untrusted files (library-level risk)
 
 **Threat Scenario**: Attacker uploads crafted PDF that exploits vulnerabilities in markitdown/pdfminer.six libraries.
 
-**Mitigation Priority**: HIGH
+**Mitigation Priority**: MEDIUM (magic byte validation added)
 
 ---
 
@@ -353,7 +373,7 @@ The `package.json` uses reputable packages. Notable security-relevant ones:
 ### Scenario 5: LLM API Key Theft
 **Threat**: Attacker extracts LLM API keys
 **Impact**: Financial loss from API abuse, potential prompt injection on other systems
-**Likelihood**: HIGH (keys partially exposed)
+**Likelihood**: MEDIUM (masking improved to show only last 4 chars - SEC-002)
 
 ---
 

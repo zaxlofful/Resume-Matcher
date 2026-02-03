@@ -302,6 +302,61 @@ ALLOWED_TYPES = {
 }
 MAX_FILE_SIZE = 4 * 1024 * 1024  # 4MB
 
+# SEC-001: Magic bytes for file type validation (defense against MIME spoofing)
+# Format: {magic_bytes: expected_extensions}
+FILE_SIGNATURES = {
+    b"%PDF": {".pdf"},  # PDF files
+    b"PK\x03\x04": {".docx"},  # DOCX (ZIP-based Office Open XML format)
+    b"\xd0\xcf\x11\xe0": {".doc"},  # Legacy DOC (OLE Compound Document format)
+}
+
+
+def _validate_file_signature(content: bytes, filename: str) -> bool:
+    """SEC-001: Validate file content matches expected magic bytes.
+
+    Prevents MIME type spoofing attacks by checking actual file content.
+
+    Args:
+        content: File content bytes
+        filename: Original filename for extension check
+
+    Returns:
+        True if file signature matches expected type, False otherwise
+    """
+    if not content or len(content) < 4:
+        return False
+
+    # Get file extension - require extension for security
+    ext = Path(filename).suffix.lower() if filename else ""
+    if not ext:
+        logger.warning(
+            "SEC-001: File upload rejected - no extension provided for %s",
+            filename,
+        )
+        return False
+
+    # Check against known signatures
+    for signature, valid_extensions in FILE_SIGNATURES.items():
+        if content.startswith(signature):
+            # If we recognize the signature, verify extension matches
+            if ext in valid_extensions:
+                return True
+            # Known signature but wrong extension - suspicious
+            logger.warning(
+                "SEC-001: File signature mismatch - signature suggests %s but extension is %s",
+                valid_extensions,
+                ext,
+            )
+            return False
+
+    # Unknown signature - reject for safety
+    logger.warning(
+        "SEC-001: Unknown file signature for %s - first 8 bytes: %s",
+        filename,
+        content[:8].hex(),
+    )
+    return False
+
 
 @router.post("/upload", response_model=ResumeUploadResponse)
 async def upload_resume(file: UploadFile = File(...)) -> ResumeUploadResponse:
@@ -310,7 +365,7 @@ async def upload_resume(file: UploadFile = File(...)) -> ResumeUploadResponse:
     Converts the file to Markdown and stores it in the database.
     Optionally parses to structured JSON if LLM is configured.
     """
-    # Validate file type
+    # Validate file type (MIME check - first layer)
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
@@ -327,6 +382,13 @@ async def upload_resume(file: UploadFile = File(...)) -> ResumeUploadResponse:
 
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Empty file")
+
+    # SEC-001: Validate file signature (magic bytes - second layer)
+    if not _validate_file_signature(content, file.filename or ""):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file content. The file does not appear to be a valid PDF or DOCX document.",
+        )
 
     # Convert to markdown
     try:
