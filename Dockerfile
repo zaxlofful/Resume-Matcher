@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Build Frontend
 # ============================================
-FROM node:22-bookworm AS frontend-builder
+FROM node:22.22.2-bookworm@sha256:ecabd1cb6956d7acfffe8af6bbfbe2df42362269fd28c227f36367213d0bb777 AS frontend-builder
 
 # Build argument for API URL (allows customization at build time)
 # Default routes requests through Next.js rewrites on the same origin.
@@ -29,7 +29,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Final Image
 # ============================================
-FROM python:3.13-slim-bookworm
+FROM python:3.13.13-slim-bookworm@sha256:3b4243071f0d572cd8f286db92a6fdaed9ae6e3abe278d4633ed460243c7fb32
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
